@@ -1,7 +1,7 @@
 // Scripts to load after UI has been initialized.
 var scripts = ["/client/compatibility/base.js", "/client/compatibility/highlight.js",
                "/client/controls.js", "/client/ida.js", "/client/idump.js", "/client/regmem.js",
-               "/client/vtimeline.js", "/client/strace.js", "/client/haddrline.js", "/client/hi.js",
+               "/client/vtimeline.js", "/client/strace.js", "/client/haddrline.js",
                "/client/static/static.js", "/client/static/graph.js"];
 
 $(document).ready(function() {
@@ -15,7 +15,7 @@ $(document).ready(function() {
   var cfgDef = $.Deferred();
   var memoryDef = $.Deferred();
   var straceDef = $.Deferred();
-  var hiDef = $.Deferred();
+
   var tagsDef = $.Deferred();
   var controlDef = $.Deferred();
   var dynamicDef = $.Deferred();
@@ -58,12 +58,7 @@ $(document).ready(function() {
     },
   });
 
-    myDocker.registerPanelType('hi', {
-    onCreate: function(myPanel, options) {
-      myPanel.layout().addItem($($("#hi-template").remove().text()));
-      hiDef.resolve();
-    },
-  });
+
 
   myDocker.registerPanelType('Memory', {
     onCreate: function(myPanel, options) {
@@ -106,7 +101,7 @@ $(document).ready(function() {
 
   var memoryPanel = myDocker.addPanel("Memory", wcDocker.DOCK.BOTTOM, idumpPanel, {h: 400});
   var stracePanel = myDocker.addPanel("strace", wcDocker.DOCK.BOTTOM, dynamicPanel, {h: 200});
-  var hi = myDocker.addPanel("hi", wcDocker.DOCK.STACKED, stracePanel, {});
+
 
 
   // apply the panel defaults
@@ -130,9 +125,9 @@ $(document).ready(function() {
   }
 
   if (has_static) {
-    $.when(timelineDef, idumpDef, memoryDef, straceDef, hiDef, controlDef, dynamicDef, cfgDef, tagsDef).done(is_done);
+    $.when(timelineDef, idumpDef, memoryDef, straceDef, controlDef, dynamicDef, cfgDef, tagsDef).done(is_done);
   } else {
-    $.when(timelineDef, idumpDef, memoryDef, straceDef, hiDef, controlDef, dynamicDef).done(is_done);
+    $.when(timelineDef, idumpDef, memoryDef, straceDef, controlDef, dynamicDef).done(is_done);
   }
 });
 
