@@ -1,12 +1,5 @@
 from __future__ import print_function
 
-# from heapinspect import *
-from heapinspect.core import *
-# from heapinspect import proc
-
-from hi import QiraProcForHI
-
-
 from qira_base import *
 import traceback
 import qira_config
@@ -279,7 +272,7 @@ def getinstructions(forknum, clnum, clstart, clend):
       arch = program.static[rret['address']]['arch']
 
       # we have the address and raw bytes, disassemble
-      raw = trace.fetch_raw_memory(i, rret['address'], rret['data'])
+      raw = trace.fetch_raw_memory(i-1, rret['address'], rret['data'])
       rret['instruction'] = str(model.Instruction(raw, rret['address'], arch))
 
     #display_call_args calls make_function_at

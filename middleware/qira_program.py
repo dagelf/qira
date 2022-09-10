@@ -438,7 +438,7 @@ class Trace:
     threading.Thread(target=self.analysis_thread).start()
 
   def fetch_raw_memory(self, clnum, address, ln):
-    return ''.join(map(chr, self.fetch_memory(clnum, address, ln).values()))
+    return bytes(self.fetch_memory(clnum, address, ln).values())
 
   # proxy the db call and fill in base memory
   def fetch_memory(self, clnum, address, ln):
@@ -457,6 +457,7 @@ class Trace:
           else:
             dat[i] = ord(self.program.static.memory(ri, 1)[0])
         except IndexError:
+          dat[i] = 0
           pass
     return dat
 
