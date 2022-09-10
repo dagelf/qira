@@ -111,7 +111,7 @@ $(document).ready(function() {
 
   // apply the panel defaults
   myDocker.findPanels().forEach(function(x) {
-//    x.title(false);
+   x.title(false);
 //    x.moveable(false);
     x.closeable(false);
     // scrollable isn't working
