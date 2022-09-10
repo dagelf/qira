@@ -1,8 +1,6 @@
 from __future__ import print_function
 from capstone import *
 import capstone # for some unexported (yet) symbols in Capstone 3.0
-import qira_config
-import string
 
 __all__ = ["Tags", "Function", "Block", "Instruction", "DESTTYPE","ABITYPE"]
 
@@ -17,119 +15,119 @@ class Instruction(object):
   def __new__(cls, *args, **kwargs):
     return CsInsn(*args, **kwargs)
 
-class BapInsn(object):
-  def __init__(self, raw, address, arch):
-    if len(raw) == 0:
-      raise ValueError("Empty memory at {0:#x}".format(address))
-    arch = 'armv7' if arch == 'arm' else arch
-    insns = list(bap.disasm(raw,
-                            addr=address,
-                            arch=arch,
-                            stop_conditions=[asm.Valid()]))
-    if len(insns) == 0:
-      raise ValueError("Invalid instruction for {1} at {2:#x}[{3}]:\n{0}".
-                       format(hexlify(raw), arch, address, len(raw)))
-    self.insn = insns[0]
-
-    self.regs_read, self.regs_write = accesses(self.insn.bil)
-    self.jumps = jumps(self.insn.bil)
-
-    self.dtype = None
-    if self.is_call():
-      self.dtype = DESTTYPE.call
-    elif self.is_conditional():
-      self.dtype = DESTTYPE.cjump
-    elif self.is_jump():
-      self.dtype = DESTTYPE.jump
-
-    dests = []
-
-    if self.code_follows():
-      dests.append((self.insn.addr + self.insn.size,
-                    DESTTYPE.implicit))
-
-    if self.insn.bil is not None:
-      for (jmp,dtype) in self.jumps:
-        if isinstance(jmp.arg, bil.Int):
-          if self.is_call():
-            dtype = DESTTYPE.call
-          dests.append((jmp.arg.value, dtype))
-
-    elif self.is_jump() or self.is_call():
-      dst = self.insn.operands[0]
-      #we want to check here if this is a relative or absolute jump
-      #once we have BIL on x86 and x86-64 this won't matter
-      if isinstance(dst, asm.Imm):
-        dst_tmp = calc_offset(dst.arg, arch)
-        if arch in ["i386","x86-64"]: #jump after instruction on x86, bap should tell us this
-          dst_tmp += self.insn.size
-        dests.append((dst_tmp + address, self.dtype))
-
-    if self.is_ret():
-      self._dests = []
-    else:
-      self._dests = dests
-
-  def __str__(self, trace=None, clnum=None):
-    # fix relative jumps to absolute address
-    for d in self._dests:
-      if d[1] is not DESTTYPE.implicit:
-        mnemonic = self.insn.asm.split("\t")[:-1] #ignore last operand
-        mnemonic.append(hex(d[0]).strip("L")) #add destination to end
-        newasm = "\t".join(mnemonic)
-        return newasm
-    return self.insn.asm
-
-  def is_jump(self):
-    if self.insn.bil is None:
-      return self.insn.has_kind(asm.Branch)
-    else:
-      return len(self.jumps) != 0
-
-  def is_hlt(self):
-    return self.insn.asm == "\thlt" #x86 specific. BAP should be identifying this as an ending
-
-  def is_ret(self):
-    return self.insn.has_kind(asm.Return)
-
-  def is_call(self):
-    return self.insn.has_kind(asm.Call)
-
-  def is_ending(self):
-    if self.is_hlt() or self.is_ret():
-      return True
-
-    if self.insn.bil is None:
-      return self.insn.has_kind(asm.Terminator)
-    else:
-      return self.insn.has_kind(asm.Terminator) or \
-            (self.is_jump() and not self.is_call())
-
-  def is_conditional(self):
-    if self.insn.bil is None:
-      return self.insn.has_kind(asm.Conditional_branch)
-    else:
-      for (_, dtype) in self.jumps:
-        if dtype == DESTTYPE.cjump:
-          return True
-      return False
-
-  def is_unconditional(self):
-    if self.insn.bil is None:
-      return self.insn.has_kind(asm.Unconditional_branch)
-    else:
-      if len(self.jumps) == 0:
-        return False
-      return not self.is_conditional()
-
-  def code_follows(self):
-    return self.is_call() or not (self.is_ret() or self.is_unconditional())
-
-  def size(self):
-    return self.insn.size
-
-  def dests(self):
-    return self._dests
+# class BapInsn(object):
+#   def __init__(self, raw, address, arch):
+#     if len(raw) == 0:
+#       raise ValueError("Empty memory at {0:#x}".format(address))
+#     arch = 'armv7' if arch == 'arm' else arch
+#     insns = list(bap.disasm(raw,
+#                             addr=address,
+#                             arch=arch,
+#                             stop_conditions=[asm.Valid()]))
+#     if len(insns) == 0:
+#       raise ValueError("Invalid instruction for {1} at {2:#x}[{3}]:\n{0}".
+#                        format(hexlify(raw), arch, address, len(raw)))
+#     self.insn = insns[0]
+#
+#     self.regs_read, self.regs_write = accesses(self.insn.bil)
+#     self.jumps = jumps(self.insn.bil)
+#
+#     self.dtype = None
+#     if self.is_call():
+#       self.dtype = DESTTYPE.call
+#     elif self.is_conditional():
+#       self.dtype = DESTTYPE.cjump
+#     elif self.is_jump():
+#       self.dtype = DESTTYPE.jump
+#
+#     dests = []
+#
+#     if self.code_follows():
+#       dests.append((self.insn.addr + self.insn.size,
+#                     DESTTYPE.implicit))
+#
+#     if self.insn.bil is not None:
+#       for (jmp,dtype) in self.jumps:
+#         if isinstance(jmp.arg, bil.Int):
+#           if self.is_call():
+#             dtype = DESTTYPE.call
+#           dests.append((jmp.arg.value, dtype))
+#
+#     elif self.is_jump() or self.is_call():
+#       dst = self.insn.operands[0]
+#       #we want to check here if this is a relative or absolute jump
+#       #once we have BIL on x86 and x86-64 this won't matter
+#       if isinstance(dst, asm.Imm):
+#         dst_tmp = calc_offset(dst.arg, arch)
+#         if arch in ["i386","x86-64"]: #jump after instruction on x86, bap should tell us this
+#           dst_tmp += self.insn.size
+#         dests.append((dst_tmp + address, self.dtype))
+#
+#     if self.is_ret():
+#       self._dests = []
+#     else:
+#       self._dests = dests
+#
+#   def __str__(self, trace=None, clnum=None):
+#     # fix relative jumps to absolute address
+#     for d in self._dests:
+#       if d[1] is not DESTTYPE.implicit:
+#         mnemonic = self.insn.asm.split("\t")[:-1] #ignore last operand
+#         mnemonic.append(hex(d[0]).strip("L")) #add destination to end
+#         newasm = "\t".join(mnemonic)
+#         return newasm
+#     return self.insn.asm
+#
+#   def is_jump(self):
+#     if self.insn.bil is None:
+#       return self.insn.has_kind(asm.Branch)
+#     else:
+#       return len(self.jumps) != 0
+#
+#   def is_hlt(self):
+#     return self.insn.asm == "\thlt" #x86 specific. BAP should be identifying this as an ending
+#
+#   def is_ret(self):
+#     return self.insn.has_kind(asm.Return)
+#
+#   def is_call(self):
+#     return self.insn.has_kind(asm.Call)
+#
+#   def is_ending(self):
+#     if self.is_hlt() or self.is_ret():
+#       return True
+#
+#     if self.insn.bil is None:
+#       return self.insn.has_kind(asm.Terminator)
+#     else:
+#       return self.insn.has_kind(asm.Terminator) or \
+#             (self.is_jump() and not self.is_call())
+#
+#   def is_conditional(self):
+#     if self.insn.bil is None:
+#       return self.insn.has_kind(asm.Conditional_branch)
+#     else:
+#       for (_, dtype) in self.jumps:
+#         if dtype == DESTTYPE.cjump:
+#           return True
+#       return False
+#
+#   def is_unconditional(self):
+#     if self.insn.bil is None:
+#       return self.insn.has_kind(asm.Unconditional_branch)
+#     else:
+#       if len(self.jumps) == 0:
+#         return False
+#       return not self.is_conditional()
+#
+#   def code_follows(self):
+#     return self.is_call() or not (self.is_ret() or self.is_unconditional())
+#
+#   def size(self):
+#     return self.insn.size
+#
+#   def dests(self):
+#     return self._dests
 
 
 def exists(cont,f):

@@ -2,7 +2,7 @@ try:
   import Queue
 except ImportError:
   import queue as Queue
-from model import Function, Block, DESTTYPE
+from static2.model import Function, Block, DESTTYPE
 import time
 
 def analyze_functions(static):

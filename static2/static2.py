@@ -37,13 +37,9 @@ import pickle
 import atexit
 from hashlib import sha1
 
-sys.path.append("../middleware")
-import qira_config
+from static2 import loader, analyzer
+from static2.model import Tags
 
-from model import *
-
-import loader
-import analyzer
 
 # the new interface for all things static
 # mostly tags, except for names and functions

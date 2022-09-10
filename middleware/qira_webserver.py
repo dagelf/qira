@@ -9,8 +9,7 @@ import time
 import base64
 import json
 
-sys.path.append(qira_config.BASEDIR+"/static2")
-import model
+from static2 import model
 
 def socket_method(func):
   def func_wrapper(*args, **kwargs):
@@ -65,9 +64,12 @@ def push_trace_update(i):
   t.needs_update = False
 
 def push_updates(full = True):
+  print(f'push updates {full} {program.get_maxclnum()}')
   socketio.emit('pmaps', program.get_pmaps(), namespace='/qira')
   socketio.emit('maxclnum', program.get_maxclnum(), namespace='/qira')
   socketio.emit('arch', list(program.tregs), namespace='/qira')
+  print(f'pushed updates {full} {program.get_maxclnum()}')
+
   if not full:
     return
   for i in program.traces:
@@ -102,7 +104,7 @@ def mwpoll():
 
 def mwpoller():
   while 1:
-    time.sleep(0.2)
+    socketio.sleep(0.2)
     mwpoll()
 
 # ***** after this line is the new server stuff *****

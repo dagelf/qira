@@ -22,8 +22,8 @@ import qiradb
 import arch
 
 # new home of static2
-sys.path.append(qira_config.BASEDIR+"/static2")
-import static2
+from static2 import static2
+
 def which(prog):
   try:
     cmd = ["which", prog]

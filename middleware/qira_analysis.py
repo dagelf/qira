@@ -15,8 +15,7 @@ try:
 except ImportError:
   from io import BytesIO as StringIO
 
-sys.path.append(qira_config.BASEDIR+"/static2")
-import static2
+from static2 import static2
 
 def ghex(a):
   if a == None:

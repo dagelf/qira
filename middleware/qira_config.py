@@ -12,7 +12,6 @@ else:
   TRACE_FILE_BASE = "/tmp/qira_logs/"
 
 BASEDIR = os.path.realpath(os.path.dirname(os.path.realpath(__file__))+"/../")
-sys.path.append(BASEDIR)
 
 # TODO: make this true in v3
 WITH_STATIC = False
