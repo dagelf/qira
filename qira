@@ -15,4 +15,5 @@ fi
 
 unset PYTHONPATH
 source $DIR/venv/bin/activate
+export PYTHONPATH=$DIR
 exec /usr/bin/env python $DIR/middleware/qira.py $*
