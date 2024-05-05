@@ -1,31 +1,15 @@
 #!/bin/bash -e
 
-# default is just pip, but on things like arch where python 3 is default, it's pip2
-PIP="pip"
+# install system deps
+if [ $(which apt-get) ]; then
+  echo "installing deps for ubuntu"
+  sudo apt-get -y install git curl python python3-virtualenv python-dev build-essential pkg-config zlib1g-dev libglib2.0-dev libpixman-1-dev
+else
+  echo "*** You'll need to install Ubuntu or get a working build env for qemu and python yourself ***"
+fi
 
-unamestr=$(uname)
-if [[ "$unamestr" == 'Linux' ]]; then
-  # we need pip to install python stuff
-  # build for building qiradb and stuff for flask like gevent
-  if [ $(which apt-get) ]; then
-    echo "installing apt packages"
-    sudo apt-get update -qq
-    sudo apt-get -qq -y install build-essential python-dev python-pip debootstrap debian-archive-keyring libjpeg-dev zlib1g-dev unzip wget graphviz curl
-
-    # install capstone
-    curl -o /tmp/libcapstone3.deb http://www.capstone-engine.org/download/3.0.4/ubuntu-14.04/libcapstone3_3.0.4-0.1ubuntu1_amd64.deb
-    sudo dpkg -i /tmp/libcapstone3.deb
-
-    # only python package we install globally
-    sudo -H $PIP install virtualenv
-  elif [ $(which pacman) ]; then
-    echo "installing pip"
-    sudo pacman -S base-devel python2-pip
-    PIP="pip2"
-  elif [ $(which yum) ]; then
-    sudo yum install python-pip python-devel gcc gcc-c++ python-virtualenv glib2-devel
-  fi
-
+# build qemu
+if [[ "$(uname)" == 'Linux' ]]; then
   if [ $(tracers/qemu/qira-i386 > /dev/null; echo $?) == 1 ]; then
     echo "QIRA QEMU appears to run okay"
   else
@@ -34,26 +18,23 @@ if [[ "$unamestr" == 'Linux' ]]; then
     ./qemu_build.sh
     cd ../
   fi
-elif [[ "$unamestr" == 'Darwin' ]]; then
-  if [ $(brew > /dev/null; echo $?) == 1 ]; then
-    echo "Installing OS X dependencies"
-    brew update
-    brew install python capstone
-    pip install virtualenv
-    cd tracers
-    ./pin_build.sh
-    cd ../
-  else
-    echo "build script only supports Homebrew"
-  fi
+else
+  echo "QEMU user only works on Linux."
+  echo "While the rest of QIRA will run, you cannot run binaries."
+  echo "This is due to QEMU user forwarding the syscalls to the kernel."
+  echo "See other backends in qira/tracers, PIN may work on Windows and OS X"
 fi
 
-echo "installing pip packages"
-virtualenv venv
+echo "building python venv"
+virtualenv -p /usr/bin/python3 venv
 source venv/bin/activate
-$PIP install --upgrade -r requirements.txt
+pip install --upgrade pip
+pip install --upgrade -r requirements.txt
 
-echo "making symlink"
+echo "running tests"
+./run_tests.sh
+
+echo "making systemwide symlink"
 sudo ln -sf $(pwd)/qira /usr/local/bin/qira
 
 echo "***************************************"

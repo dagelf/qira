@@ -4,7 +4,9 @@ function on_setiaddr(iaddr) { DS("setiaddr");
   update_iaddr(iaddr);
 } stream.on('setiaddr', on_setiaddr);
 
-function on_setclnum(forknum, clnum) { DS("setclnum");
+function on_setclnum(msg) { DS("setclnum");
+  var forknum = msg['forknum'];
+  var clnum = msg['clnum'];
   Session.set('forknum', forknum);
   Session.set('clnum', clnum);
   push_history("remote setclnum");
@@ -76,9 +78,9 @@ $(document).ready(function() {
     }
     if (isend) is_dragging = false;
   }
-  $('#cfg-static').on('mousewheel', '#outergbox', function(e) {
-    var wdx = e.originalEvent.wheelDeltaX;
-    var wdy = e.originalEvent.wheelDeltaY;
+  $('#cfg-static').on('wheel', '#outergbox', function(e) {
+    var wdx = e.originalEvent.deltaX;
+    var wdy = e.originalEvent.deltaY;
     $("#gbox").css("margin-left", fdec($("#gbox").css("margin-left")) + wdx);
     $("#gbox").css("margin-top", fdec($("#gbox").css("margin-top")) + wdy);
   });
@@ -101,25 +103,20 @@ $(document).ready(function() {
       endDrag(e.screenX, e.screenY, true);
     }*/
   });
-  $('body').on('mousewheel', '.flat', function(e) {
+  $('body').on('wheel', '.flat', function(e) {
     var cdr = $(".flat").children();
-    // TODO: HAXX!!!
-    if (e.originalEvent.wheelDelta < 0) {
-      Session.set('iview', get_address_from_class(cdr[16].childNodes[0]));
-    } else if (e.originalEvent.wheelDelta > 0) {
-      Session.set('iview', get_address_from_class(cdr[14].childNodes[0]));
-    }
-    /*if (e.originalEvent.wheelDelta < 0) {
+    p(e.originalEvent.deltaY);
+    if (e.originalEvent.deltaY > 0) {
       Session.set('iview', bn_add(Session.get('iview'), -1));
-    } else if (e.originalEvent.wheelDelta > 0) {
+    } else if (e.originalEvent.deltaY < 0) {
       Session.set('iview', bn_add(Session.get('iview'), 1));
-    }*/
+    }
   });
-  $("#idump")[0].addEventListener("mousewheel", function(e) {
+  $("#idump")[0].addEventListener("wheel", function(e) {
     //p("idump mousewheel");
-    if (e.wheelDelta < 0) {
+    if (e.deltaY > 0) {
       Session.set('clnum', Session.get('clnum')+1);
-    } else if (e.wheelDelta > 0) {
+    } else if (e.deltaY < 0) {
       Session.set('clnum', Session.get('clnum')-1);
     }
   });
@@ -129,6 +126,7 @@ Session.setDefault("flat", false);
 
 // keyboard shortcuts
 window.onkeydown = function(e) {
+  if (!$(e.target).is("input") && !((e.ctrlKey || e.metaKey) && e.keyCode === 67)) e.preventDefault();
   //p(e.keyCode);
   //p(e);
   if (e.ctrlKey == true) return;
@@ -210,6 +208,9 @@ window.onkeydown = function(e) {
 
     if (tagname == 'name') {
       var dat = prompt("Rename address "+addr, old);
+      //having no comment makes sense. having no name does not.
+      //or we should default to the autogen name like IDA
+      if (dat == "") return;
     } else {
       var dat = prompt("Enter comment for "+addr, old);
     }
@@ -224,8 +225,14 @@ window.onkeydown = function(e) {
       replace_names();
     } else if (tagname == 'comment') {
       // do this explictly?
-      $(".comment_"+addr).html("; "+dat);
+      if (dat != "")
+        $(".comment_"+addr).html("; "+dat);
+      else
+        $(".comment_"+addr).html("");
     }
+    Session.set("ida_sync_addr", addr);
+    Session.set("ida_sync_tagname", tagname);
+    Session.set("ida_sync_dat", dat);
   } else if (e.keyCode == 71) {
     var dat = prompt("Enter change or address");
     if (dat == undefined) return;

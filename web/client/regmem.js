@@ -124,7 +124,19 @@ Deps.autorun(function() { DA("emit getregisters");
   stream.emit('getregisters', forknum, clnum-1);
 });
 
+function dump_stack(regs) {
+  console.log(regs);
+  var sp = regs.find(function(elem) {
+      return elem.name == "RSP" || elem.name == "ESP";
+  });
+  if (sp) {
+    update_dview(sp.value);
+  }
+}
 function on_registers(msg) { DS("registers");
+  if (!current_regs) { // on first load
+    dump_stack(msg);
+  }
   current_regs = msg;
   redraw_reg_flags();
   var tsize = msg[0]['size'];
@@ -145,7 +157,7 @@ function on_registers(msg) { DS("registers");
     regviewer += '<div class="reg '+r.regactions+'">'+
         '<div class="register data data_'+hex(r.address)+'" id="data_'+hex(r.address)+'" style="color:'+regcolors[r.num]+'">'+r.display_name+': </div>'+
         '<span class="'+exclass+'">'+r.value+'</span>'+
-      '</div>';
+      '</div><br>';
   }
   $('#regviewer').html(regviewer);
   rehighlight();
@@ -172,7 +184,7 @@ function on_clnum(msg) { DS("clnum");
         '<span class="'+get_data_type(dc.address, true)+'">'+dc.address+'</span> '+
         ((dc.type == "S")?'&lt;--':'--')+' '+
         '<span class="'+get_data_type(dc.data, true)+'">'+dc.data+'</span> '+
-      '</div> ';
+      '</div> <br>';
   }
   $('#datachanges').html(datachanges);
 } stream.on('clnum', on_clnum);

@@ -1,4 +1,7 @@
+from __future__ import print_function
+
 from qira_base import *
+import traceback
 import qira_config
 import os
 import sys
@@ -6,15 +9,14 @@ import time
 import base64
 import json
 
-sys.path.append(qira_config.BASEDIR+"/static2")
-import model
+from static2 import model
 
 def socket_method(func):
   def func_wrapper(*args, **kwargs):
     # before things are initted in the js, we get this
     for i in args:
       if i == None:
-        #print "BAD ARGS TO %-20s" % (func.func_name), "with",args
+        #print "BAD ARGS TO %-20s" % (func.__name__), "with",args
         return
     try:
       start = time.time()
@@ -23,10 +25,11 @@ def socket_method(func):
 
       # print slow calls, slower than 50ms
       if tm > 50 or qira_config.WEBSOCKET_DEBUG:
-        print "SOCKET %6.2f ms in %-20s with" % (tm, func.func_name), args
+        print("SOCKET %6.2f ms in %-20s with" % (tm, func.__name__), args)
       return ret
-    except Exception, e:
-      print "ERROR",e,"in",func.func_name,"with",args
+    except Exception as e:
+      traceback.print_exc()
+      print("ERROR",e,"in",func.__name__,"with",args)
   return func_wrapper
 
 import qira_socat
@@ -38,18 +41,13 @@ import qira_log
 LIMIT = 0
 
 from flask import Flask, Response, redirect, request
-from flask.ext.socketio import SocketIO, emit
+from flask_socketio import SocketIO, emit
 
 # http://stackoverflow.com/questions/8774958/keyerror-in-module-threading-after-a-successful-py-test-run
 import threading
 import sys
 if 'threading' in sys.modules:
   del sys.modules['threading']
-import gevent
-import gevent.socket
-import gevent.monkey
-gevent.monkey.patch_all()
-# done with that
 
 app = Flask(__name__)
 #app.config['DEBUG'] = True
@@ -66,9 +64,12 @@ def push_trace_update(i):
   t.needs_update = False
 
 def push_updates(full = True):
+  print(f'push updates {full} {program.get_maxclnum()}')
   socketio.emit('pmaps', program.get_pmaps(), namespace='/qira')
   socketio.emit('maxclnum', program.get_maxclnum(), namespace='/qira')
-  socketio.emit('arch', program.tregs, namespace='/qira')
+  socketio.emit('arch', list(program.tregs), namespace='/qira')
+  print(f'pushed updates {full} {program.get_maxclnum()}')
+
   if not full:
     return
   for i in program.traces:
@@ -103,7 +104,7 @@ def mwpoll():
 
 def mwpoller():
   while 1:
-    time.sleep(0.2)
+    socketio.sleep(0.2)
     mwpoll()
 
 # ***** after this line is the new server stuff *****
@@ -112,7 +113,7 @@ def mwpoller():
 @socket_method
 def forkat(forknum, clnum, pending):
   global program
-  print "forkat",forknum,clnum,pending
+  print("forkat",forknum,clnum,pending)
 
   REGSIZE = program.tregs[1]
   dat = []
@@ -146,9 +147,11 @@ def forkat(forknum, clnum, pending):
 @socket_method
 def deletefork(forknum):
   global program
-  print "deletefork", forknum
+  print("deletefork", forknum)
   os.unlink(qira_config.TRACE_FILE_BASE+str(int(forknum)))
-  del program.traces[forknum]
+  if forknum in program.traces:
+    program.traces[forknum].keep_analysis_thread = False
+    del program.traces[forknum]
   push_updates()
 
 @socketio.on('doslice', namespace='/qira')
@@ -156,7 +159,7 @@ def deletefork(forknum):
 def slice(forknum, clnum):
   trace = program.traces[forknum]
   data = qira_analysis.slice(trace, clnum)
-  print "slice",forknum,clnum, data
+  print("slice",forknum,clnum, data)
   emit('slice', forknum, data);
 
 @socketio.on('doanalysis', namespace='/qira')
@@ -172,7 +175,7 @@ def analysis(forknum):
 @socket_method
 def connect():
   global program
-  print "client connected", program.get_maxclnum()
+  print("client connected", program.get_maxclnum())
   push_updates()
 
 @socketio.on('getclnum', namespace='/qira')
@@ -245,7 +248,7 @@ def navigatefunction(forknum, clnum, start):
     if clnum == trace.minclnum or clnum == trace.maxclnum:
       ret = clnum
       break
-  emit('setclnum', forknum, ret)
+  emit('setclnum', {'forknum': forknum, 'clnum': ret})
 
 
 @socketio.on('getinstructions', namespace='/qira')
@@ -263,7 +266,7 @@ def getinstructions(forknum, clnum, clstart, clend):
       rret = rret[0]
 
     instr = program.static[rret['address']]['instruction']
-    rret['instruction'] = str(instr)
+    rret['instruction'] = instr.__str__(trace, i) #i == clnum
 
     # check if static fails at this
     if rret['instruction'] == "":
@@ -271,7 +274,7 @@ def getinstructions(forknum, clnum, clstart, clend):
       arch = program.static[rret['address']]['arch']
 
       # we have the address and raw bytes, disassemble
-      raw = trace.fetch_raw_memory(i, rret['address'], rret['data'])
+      raw = trace.fetch_raw_memory(i-1, rret['address'], rret['data'])
       rret['instruction'] = str(model.Instruction(raw, rret['address'], arch))
 
     #display_call_args calls make_function_at
@@ -396,9 +399,6 @@ def getregisters(forknum, clnum):
 @app.route('/', defaults={'path': 'index.html'})
 @app.route('/<path:path>')
 def serve(path):
-  if 'Firefox' in request.headers.get('User-Agent'):
-    return "<pre>WTF you use Firefox?!?\n\nGo download a real web browser, like Chrome, and try this again"
-
   # best security?
   if ".." in path:
     return
@@ -431,11 +431,11 @@ def run_server(largs, lprogram):
   import qira_webstatic
   qira_webstatic.init(lprogram)
 
-  print "****** starting WEB SERVER on %s:%d" % (qira_config.HOST, qira_config.WEB_PORT)
-  threading.Thread(target=mwpoller).start()
+  print("****** starting WEB SERVER on %s:%d" % (qira_config.HOST, qira_config.WEB_PORT))
+  socketio.start_background_task(target=mwpoller)
   try:
-    socketio.run(app, host=qira_config.HOST, port=qira_config.WEB_PORT, log=open("/dev/null", "w"))
+    socketio.run(app, host=qira_config.HOST, port=qira_config.WEB_PORT, log_output=False)
   except KeyboardInterrupt:
-    print "*** User raised KeyboardInterrupt"
+    print("*** User raised KeyboardInterrupt")
     exit()
 
